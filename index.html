@@ -197,11 +197,20 @@ if ('serviceWorker' in navigator) {
   .popup-link{display:inline-block;margin-top:7px;color:var(--moss);font-weight:600;cursor:pointer;font-size:.76rem;}
 
   @media(max-width:680px){
-    .shell{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
-    .sidebar{max-height:35vh;}
-    .detail-view{padding:16px;}
+    .shell{display:block;height:calc(100vh - 54px);overflow:hidden;}
+    .sidebar{position:fixed;inset:54px 0 0 0;z-index:50;display:flex;flex-direction:column;background:var(--snow);}
+    .sidebar.hidden{transform:translateX(-100%);pointer-events:none;}
+    .main-panel{position:fixed;inset:54px 0 0 0;z-index:60;background:var(--cream);display:none;flex-direction:column;}
+    .main-panel.mobile-active{display:flex;}
+    .detail-view{padding:14px;}
     .detail-header{flex-direction:column;}
+    .back-btn{display:flex;}
+    .header-right{gap:5px;}
+    .btn-export{display:none;}
+    .nav-tab{font-size:.7rem;padding:5px 9px;}
+    .list-tab{font-size:.7rem;padding:4px 9px;}
   }
+  .back-btn{display:none;align-items:center;gap:8px;padding:11px 14px;background:white;border-bottom:1px solid var(--stone);cursor:pointer;font-size:.85rem;font-weight:600;color:var(--moss);flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -244,7 +253,8 @@ if ('serviceWorker' in navigator) {
     <div class="place-list" id="placeList"></div>
   </aside>
 
-  <main class="main-panel">
+  <main class="main-panel" id="mainPanel">
+    <div class="back-btn" id="backBtn" onclick="goBackToList()">← Tilbake til liste</div>
     <div class="view active" id="viewDetail">
       <div class="welcome" id="welcomeMsg">
         <div class="big">🗺️</div>
