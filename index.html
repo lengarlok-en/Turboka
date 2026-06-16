@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Turboka</title>
+<meta name="application-name" content="Turboka">
+<meta name="description" content="Din personlige reise- og turplanlegger">
+<meta name="theme-color" content="#3D5A3E">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Turboka">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj4KICA8cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjM0Q1QTNFIi8+CiAgPHRleHQgeD0iOTYiIHk9IjEzMCIgZm9udC1zaXplPSIxMTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfl7rvuI88L3RleHQ+CiAgPHRleHQgeD0iOTYiIHk9IjE3NSIgZm9udC1zaXplPSIyOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI0M4QkZCMCIgZm9udC1mYW1pbHk9InNlcmlmIiBmb250LXN0eWxlPSJpdGFsaWMiPnR1cmJva2E8L3RleHQ+Cjwvc3ZnPg==">
+<script>
+// Inline PWA manifest
+const manifest = {
+  name: "Turboka",
+  short_name: "Turboka",
+  description: "Din personlige reise- og turplanlegger",
+  start_url: ".",
+  display: "standalone",
+  background_color: "#3D5A3E",
+  theme_color: "#3D5A3E",
+  orientation: "portrait-primary",
+  icons: [
+    {
+      src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj4KICA8cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjM0Q1QTNFIi8+CiAgPHRleHQgeD0iOTYiIHk9IjEzMCIgZm9udC1zaXplPSIxMTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfl7rvuI88L3RleHQ+CiAgPHRleHQgeD0iOTYiIHk9IjE3NSIgZm9udC1zaXplPSIyOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI0M4QkZCMCIgZm9udC1mYW1pbHk9InNlcmlmIiBmb250LXN0eWxlPSJpdGFsaWMiPnR1cmJva2E8L3RleHQ+Cjwvc3ZnPg==",
+      sizes: "192x192",
+      type: "image/svg+xml",
+      purpose: "any maskable"
+    }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+const manifestURL = URL.createObjectURL(blob);
+const link = document.createElement('link');
+link.rel = 'manifest'; link.href = manifestURL;
+document.currentScript.after(link);
+
+// Service Worker for offline support
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'turboka-v1';
+    const ASSETS = [
+      'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+      'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+      'https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500;600&display=swap'
+    ];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+    self.addEventListener('fetch', e => {
+      if (e.request.url.includes('supabase') || e.request.url.includes('anthropic')) return;
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => r)));
+    });
+  `;
+  const swBlob = new Blob([swCode], {type: 'application/javascript'});
+  const swURL = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swURL, {scope: './'}).catch(()=>{});
+}
+</script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;1,300&family=Inter:wght@400;500;600&display=swap');
+  :root {
+    --moss:#3D5A3E;--sage:#7A9E7E;--stone:#C8BFB0;
+    --cream:#F5F0E8;--ink:#1C1F1A;--dusk:#8B7355;
+    --sky:#5B8FA8;--snow:#FFFFFF;--warn:#C0603B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;}
+
+  header{background:var(--moss);color:var(--cream);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:500;box-shadow:0 2px 12px rgba(0,0,0,.25);gap:12px;flex-wrap:wrap;}
+  header h1{font-family:'Fraunces',serif;font-weight:300;font-size:1.4rem;letter-spacing:.02em;white-space:nowrap;}
+  header h1 span{font-style:italic;color:var(--stone);}
+  .header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .nav-tabs{display:flex;gap:3px;}
+  .nav-tab{padding:6px 13px;border-radius:20px;border:none;background:rgba(255,255,255,.15);color:var(--cream);font-family:'Inter',sans-serif;font-size:.78rem;font-weight:500;cursor:pointer;transition:background .15s;white-space:nowrap;}
+  .nav-tab.active,.nav-tab:hover{background:rgba(255,255,255,.3);}
+  .list-toggle{display:flex;border:1.5px solid rgba(255,255,255,.3);border-radius:20px;overflow:hidden;}
+  .list-tab{padding:5px 12px;border:none;background:transparent;color:rgba(255,255,255,.7);font-family:'Inter',sans-serif;font-size:.75rem;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .list-tab.active{background:rgba(255,255,255,.25);color:white;}
+  .btn-export{padding:5px 12px;border-radius:20px;border:1.5px solid rgba(255,255,255,.3);background:transparent;color:rgba(255,255,255,.85);font-family:'Inter',sans-serif;font-size:.75rem;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .btn-export:hover{background:rgba(255,255,255,.2);}
+
+  .shell{display:grid;grid-template-columns:310px 1fr;height:calc(100vh - 54px);}
+  .sidebar{background:var(--snow);border-right:1px solid var(--stone);display:flex;flex-direction:column;overflow:hidden;}
+  .sidebar-top{padding:12px;border-bottom:1px solid var(--stone);display:flex;flex-direction:column;gap:7px;}
+  .btn-add{background:var(--moss);color:var(--cream);border:none;border-radius:8px;padding:9px 12px;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;width:100%;transition:background .2s;}
+  .btn-add:hover{background:#2e4430;}
+  .filter-row{display:flex;gap:4px;flex-wrap:wrap;}
+  .chip{padding:3px 9px;border-radius:20px;border:1.5px solid var(--stone);background:transparent;font-size:.7rem;font-weight:500;cursor:pointer;color:var(--ink);transition:all .15s;}
+  .chip.active,.chip:hover{background:var(--moss);color:var(--cream);border-color:var(--moss);}
+
+  .family-banner{background:linear-gradient(135deg,#e8f2f8,#d4e8d4);border-bottom:1px solid var(--stone);padding:8px 14px;font-size:.75rem;color:var(--moss);display:flex;align-items:center;gap:6px;font-weight:600;}
+  .private-banner{background:#fdf6ee;border-bottom:1px solid var(--stone);padding:8px 14px;font-size:.75rem;color:var(--dusk);display:flex;align-items:center;gap:6px;font-weight:600;}
+  .sync-indicator{margin-left:auto;font-size:.68rem;font-weight:400;opacity:.7;}
+
+  .place-list{overflow-y:auto;flex:1;}
+  .place-card{padding:11px 14px;border-bottom:1px solid #eee;cursor:pointer;transition:background .15s;display:flex;gap:9px;align-items:flex-start;}
+  .place-card:hover{background:var(--cream);}
+  .place-card.selected{background:#eef5ef;border-left:3px solid var(--moss);}
+  .card-icon{font-size:1.2rem;margin-top:1px;flex-shrink:0;}
+  .card-body{flex:1;min-width:0;}
+  .card-name{font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .card-meta{font-size:.72rem;color:var(--dusk);margin-top:1px;}
+  .card-badges{display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;}
+  .card-tag{display:inline-block;color:white;font-size:.6rem;padding:1px 6px;border-radius:10px;}
+  .empty-list{padding:32px 14px;text-align:center;color:#aaa;font-size:.82rem;line-height:1.6;}
+  .empty-list .big{font-size:2rem;margin-bottom:6px;}
+
+  .main-panel{display:flex;flex-direction:column;overflow:hidden;}
+  .view{display:none;flex:1;overflow-y:auto;flex-direction:column;}
+  .view.active{display:flex;}
+
+  .welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#aaa;padding:40px;text-align:center;}
+  .welcome .big{font-size:3rem;}
+  .welcome h2{font-family:'Fraunces',serif;font-weight:300;font-size:1.3rem;color:var(--ink);}
+
+  #mapContainer{flex:1;min-height:0;}
+  #leafletMap{width:100%;height:100%;}
+  .map-legend{padding:10px 18px;background:white;border-top:1px solid var(--stone);display:flex;gap:16px;font-size:.75rem;align-items:center;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:4px;}
+  .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+
+  .detail-view{padding:24px 28px;}
+  .detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px;}
+  .detail-title{font-family:'Fraunces',serif;font-weight:600;font-size:1.7rem;line-height:1.2;}
+  .detail-subtitle{color:var(--dusk);margin-top:3px;font-size:.85rem;display:flex;align-items:center;gap:8px;}
+  .list-badge{font-size:.68rem;padding:2px 8px;border-radius:10px;font-weight:600;}
+  .list-badge.family{background:#e8f2f8;color:var(--sky);}
+  .list-badge.private{background:#fdf3e8;color:var(--dusk);}
+  .detail-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+  .btn-sm{padding:5px 11px;border-radius:7px;border:1.5px solid var(--stone);background:white;font-size:.76rem;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap;}
+  .btn-sm:hover{background:var(--cream);}
+  .btn-sm.danger:hover{background:#fdecea;border-color:var(--warn);color:var(--warn);}
+
+  .date-section{background:white;border:1px solid var(--stone);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;}
+  .date-field{display:flex;flex-direction:column;gap:4px;}
+  .date-field label{font-size:.72rem;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.05em;}
+  .date-field input,.date-field select{padding:7px 10px;border:1.5px solid var(--stone);border-radius:7px;font-family:'Inter',sans-serif;font-size:.83rem;color:var(--ink);background:var(--cream);}
+  .date-field input:focus,.date-field select:focus{outline:2px solid var(--moss);border-color:transparent;}
+  .status-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:20px;font-size:.75rem;font-weight:600;}
+  .status-wishlist{background:#fdf3e8;color:var(--dusk);}
+  .status-planned{background:#e8f2f8;color:var(--sky);}
+  .status-done{background:#eef5ef;color:var(--moss);}
+
+  .stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .stat-box{background:white;border:1px solid var(--stone);border-radius:10px;padding:9px 14px;min-width:90px;text-align:center;}
+  .stat-val{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:600;color:var(--moss);}
+  .stat-lbl{font-size:.68rem;color:#888;margin-top:2px;text-transform:uppercase;letter-spacing:.05em;}
+
+  .ai-section{background:white;border:1px solid var(--stone);border-radius:12px;padding:16px 18px;margin-bottom:16px;}
+  .ai-section h3{font-family:'Fraunces',serif;font-weight:600;font-size:1rem;margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+  .ai-badge{font-family:'Inter',sans-serif;font-size:.6rem;background:var(--sage);color:white;padding:2px 6px;border-radius:10px;font-weight:600;}
+  .ai-content{font-size:.86rem;line-height:1.7;color:#333;}
+  .ai-content p{margin-bottom:7px;}
+  .ai-content strong{color:var(--moss);}
+  .loading-dots span{display:inline-block;width:6px;height:6px;background:var(--sage);border-radius:50%;margin:0 2px;animation:bounce 1.2s infinite;}
+  .loading-dots span:nth-child(2){animation-delay:.2s;}
+  .loading-dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-6px);}}
+  .notes-area{width:100%;border:1px solid var(--stone);border-radius:8px;padding:9px;font-family:'Inter',sans-serif;font-size:.84rem;resize:vertical;min-height:75px;background:var(--cream);color:var(--ink);}
+  .notes-area:focus{outline:2px solid var(--moss);border-color:transparent;}
+
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:600;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:white;border-radius:14px;padding:22px 24px;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto;}
+  .modal h2{font-family:'Fraunces',serif;font-weight:600;font-size:1.25rem;margin-bottom:14px;}
+  .form-group{margin-bottom:11px;}
+  .form-group label{display:block;font-size:.73rem;font-weight:600;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+  .form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 11px;border:1.5px solid var(--stone);border-radius:8px;font-family:'Inter',sans-serif;font-size:.86rem;color:var(--ink);background:var(--cream);}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:2px solid var(--moss);border-color:transparent;}
+  .modal-row{display:flex;gap:9px;}
+  .modal-row .form-group{flex:1;}
+  .modal-actions{display:flex;gap:7px;margin-top:14px;justify-content:flex-end;}
+  .btn-cancel{padding:8px 15px;border:1.5px solid var(--stone);background:white;border-radius:8px;font-family:'Inter',sans-serif;cursor:pointer;font-size:.86rem;}
+  .btn-save{padding:8px 18px;background:var(--moss);color:white;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;font-size:.86rem;}
+  .btn-save:hover{background:#2e4430;}
+
+  /* IMPORT modal */
+  .import-area{width:100%;min-height:100px;border:2px dashed var(--stone);border-radius:8px;padding:12px;font-family:'Inter',sans-serif;font-size:.82rem;background:var(--cream);color:var(--ink);resize:vertical;}
+  .import-area:focus{outline:2px solid var(--moss);border-color:var(--moss);}
+
+  .leaflet-popup-content{font-family:'Inter',sans-serif;font-size:.83rem;min-width:150px;}
+  .popup-name{font-weight:700;font-size:.9rem;margin-bottom:3px;}
+  .popup-meta{color:#777;font-size:.75rem;}
+  .popup-link{display:inline-block;margin-top:7px;color:var(--moss);font-weight:600;cursor:pointer;font-size:.76rem;}
+
+  @media(max-width:680px){
+    .shell{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
+    .sidebar{max-height:35vh;}
+    .detail-view{padding:16px;}
+    .detail-header{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tur<span>boka</span></h1>
+  <div class="header-right">
+    <div class="list-toggle">
+      <button class="list-tab active" id="ltPrivate" onclick="setListMode('private')">👤 Min liste</button>
+      <button class="list-tab" id="ltFamily" onclick="setListMode('family')">👨‍👩‍👧 Familie</button>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tabDetail" onclick="switchView('detail')">📋 Detaljer</button>
+      <button class="nav-tab" id="tabMap" onclick="switchView('map')">🗺️ Kart</button>
+    </div>
+    <button class="btn-export" onclick="openExportModal()">💾 Eksport/import</button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <button class="btn-add" onclick="openModal()">+ Legg til sted</button>
+      <div class="filter-row">
+        <button class="chip active" onclick="setFilter('alle',this)">Alle</button>
+        <button class="chip" onclick="setFilter('fjelltur',this)">⛰️ Fjell</button>
+        <button class="chip" onclick="setFilter('sykkel',this)">🚴 Sykkel</button>
+        <button class="chip" onclick="setFilter('skitur',this)">⛷️ Ski</button>
+        <button class="chip" onclick="setFilter('ferie',this)">✈️ Ferie</button>
+        <button class="chip" onclick="setFilter('dagstur',this)">🥾 Dagstur</button>
+      </div>
+      <div class="filter-row">
+        <button class="chip active" id="sf-alle" onclick="setStatusFilter('alle',this)">Alle</button>
+        <button class="chip" id="sf-wishlist" onclick="setStatusFilter('wishlist',this)">💭 Ønskeliste</button>
+        <button class="chip" id="sf-planned" onclick="setStatusFilter('planned',this)">📅 Planlagt</button>
+        <button class="chip" id="sf-done" onclick="setStatusFilter('done',this)">✅ Gjennomført</button>
+      </div>
+    </div>
+    <div id="listBanner" class="private-banner">👤 Min private liste <span class="sync-indicator">lagret lokalt</span></div>
+    <div class="place-list" id="placeList"></div>
+  </aside>
+
+  <main class="main-panel">
+    <div class="view active" id="viewDetail">
+      <div class="welcome" id="welcomeMsg">
+        <div class="big">🗺️</div>
+        <h2>Din personlige turbok</h2>
+        <p>Bytt mellom <strong>Min liste</strong> og <strong>Familie</strong> øverst.<br>Trykk <strong>+ Legg til sted</strong> for å starte.</p>
+      </div>
+      <div id="detailContent" style="display:none;flex:1;overflow-y:auto;"></div>
+    </div>
+    <div class="view" id="viewMap">
+      <div id="mapContainer"><div id="leafletMap"></div></div>
+      <div class="map-legend">
+        <strong style="font-size:.76rem">Status:</strong>
+        <div class="legend-item"><div class="legend-dot" style="background:#8B7355"></div>Ønskeliste</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#5B8FA8"></div>Planlagt</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3D5A3E"></div>Gjennomført</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9B59B6"></div>Familie</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>Legg til nytt sted</h2>
+    <div class="form-group">
+      <label>Navn på sted / tur</label>
+      <input type="text" id="inp-name" placeholder="f.eks. Besseggen, Mallorca, Birken..."/>
+    </div>
+    <div class="modal-row">
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="inp-type">
+          <option value="fjelltur">⛰️ Fjelltur</option>
+          <option value="sykkel">🚴 Sykkeltur</option>
+          <option value="skitur">⛷️ Skitur</option>
+          <option value="ferie">✈️ Feriemål</option>
+          <option value="dagstur">🥾 Dagstur</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Land / region</label>
+        <input type="text" id="inp-region" placeholder="f.eks. Norge, Spania..."/>
+      </div>
+    </div>
+    <div class="modal-row">
+      <div class="form-group">
+        <label>Status</label>
+        <select id="inp-status">
+          <option value="wishlist">💭 Ønskeliste</option>
+          <option value="planned">📅 Planlagt</option>
+          <option value="done">✅ Gjennomført</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Dato</label>
+        <input type="date" id="inp-date"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Liste</label>
+      <select id="inp-list">
+        <option value="private">👤 Min private liste</option>
+        <option value="family">👨‍👩‍👧 Familielisten (delt)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Egne notater (valgfritt)</label>
+      <textarea id="inp-notes" rows="2" placeholder="Tips du har fått, hvem anbefalte det..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Avbryt</button>
+      <button class="btn-save" onclick="savePlace()">Lagre & hent info</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT/IMPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h2>💾 Eksport / Import</h2>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <p style="font-size:.85rem;margin-bottom:10px;color:#555;">Last ned en sikkerhetskopi av din private liste som JSON-fil.</p>
+        <button class="btn-save" style="width:100%" onclick="exportData()">⬇️ Last ned mine data (JSON)</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--stone);">
+      <div>
+        <p style="font-size:.85rem;margin-bottom:8px;color:#555;">Importer data fra en tidligere sikkerhetskopi eller fra et familiemedlem. <strong>Eksisterende steder med samme ID beholdes.</strong></p>
+        <textarea class="import-area" id="importText" placeholder="Lim inn JSON her, eller..."></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;">
+          <label style="flex:1;">
+            <input type="file" accept=".json" id="importFile" style="display:none" onchange="loadImportFile(event)"/>
+            <span class="btn-cancel" style="display:block;text-align:center;cursor:pointer;">📂 Velg fil</span>
+          </label>
+          <button class="btn-save" style="flex:1" onclick="importData()">⬆️ Importer</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn-cancel" onclick="closeExportModal()">Lukk</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const SUPABASE_URL = 'https://fvdjydeytaaqfkprfgfo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2ZGp5ZGV5dGFhcWZrcHJmZ2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MTcwMjQsImV4cCI6MjA5NzE5MzAyNH0.FznvDCPpiGTLMU00-c0bNjMALFa_82eix8sPStRPP9s';
+const SB_HEADERS = {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation'};
+
+// ── STATE ──
+let privatePlaces = JSON.parse(localStorage.getItem('turboka_v2') || '[]');
+let familyPlaces = [];
+let listMode = 'private'; // 'private' | 'family'
+let activeFilter = 'alle';
+let activeStatusFilter = 'alle';
+let selectedId = null;
+let currentView = 'detail';
+let map = null;
+let markers = {};
+
+const icons = {fjelltur:'⛰️',sykkel:'🚴',skitur:'⛷️',ferie:'✈️',dagstur:'🥾'};
+const labels = {fjelltur:'Fjelltur',sykkel:'Sykkeltur',skitur:'Skitur',ferie:'Feriemål',dagstur:'Dagstur'};
+const statusColors = {wishlist:'#8B7355',planned:'#5B8FA8',done:'#3D5A3E'};
+const statusLabels = {wishlist:'💭 Ønskeliste',planned:'📅 Planlagt',done:'✅ Gjennomført'};
+const statusClass = {wishlist:'status-wishlist',planned:'status-planned',done:'status-done'};
+
+function getPlaces() { return listMode === 'family' ? familyPlaces : privatePlaces; }
+function savePrivate() { localStorage.setItem('turboka_v2', JSON.stringify(privatePlaces)); }
+
+function formatDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('no-NO',{day:'numeric',month:'long',year:'numeric'});
+}
+
+// ── SUPABASE ──
+async function fetchFamily() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/family_places?order=created_at.desc`, {headers: SB_HEADERS});
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    familyPlaces = data.map(r => ({
+      id: r.id, name: r.name, type: r.type, region: r.region,
+      status: r.status, date: r.date, notes: r.notes,
+      aiInfo: r.ai_info, stats: r.stats, lat: r.lat, lng: r.lng,
+      list: 'family'
+    }));
+    if (listMode === 'family') renderList();
+    updateSyncIndicator('✓ synkronisert');
+  } catch(e) {
+    updateSyncIndicator('⚠️ frakoblet');
+  }
+}
+
+async function saveToFamily(p) {
+  try {
+    const row = {id:p.id,name:p.name,type:p.type,region:p.region,status:p.status,date:p.date||null,notes:p.notes,ai_info:p.aiInfo,stats:p.stats,lat:p.lat,lng:p.lng};
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/family_places`, {
+      method:'POST', headers:{...SB_HEADERS,'Prefer':'resolution=merge-duplicates,return=representation'},
+      body: JSON.stringify(row)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await fetchFamily();
+  } catch(e) { showToast('⚠️ Kunne ikke lagre til familieliste'); }
+}
+
+async function updateInFamily(p) {
+  try {
+    const row = {name:p.name,type:p.type,region:p.region,status:p.status,date:p.date||null,notes:p.notes,ai_info:p.aiInfo,stats:p.stats,lat:p.lat,lng:p.lng};
+    await fetch(`${SUPABASE_URL}/rest/v1/family_places?id=eq.${p.id}`, {
+      method:'PATCH', headers:SB_HEADERS, body:JSON.stringify(row)
+    });
+    await fetchFamily();
+  } catch(e) {}
+}
+
+async function deleteFromFamily(id) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/family_places?id=eq.${id}`, {method:'DELETE',headers:SB_HEADERS});
+    await fetchFamily();
+  } catch(e) {}
+}
+
+function updateSyncIndicator(txt) {
+  const el = document.querySelector('.sync-indicator');
+  if (el) el.textContent = txt;
+}
+
+// ── LIST MODE ──
+function setListMode(mode) {
+  listMode = mode;
+  selectedId = null;
+  document.getElementById('ltPrivate').classList.toggle('active', mode==='private');
+  document.getElementById('ltFamily').classList.toggle('active', mode==='family');
+  const banner = document.getElementById('listBanner');
+  if (mode === 'family') {
+    banner.className = 'family-banner';
+    banner.innerHTML = '👨‍👩‍👧 Familielisten – delt med alle <span class="sync-indicator">laster...</span>';
+    fetchFamily();
+  } else {
+    banner.className = 'private-banner';
+    banner.innerHTML = '👤 Min private liste <span class="sync-indicator">lagret lokalt</span>';
+  }
+  // Update add modal default
+  document.getElementById('inp-list').value = mode;
+  renderList();
+  document.getElementById('welcomeMsg').style.display = 'flex';
+  document.getElementById('detailContent').style.display = 'none';
+}
+
+// ── VIEW ──
+function switchView(v) {
+  currentView = v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
+  document.getElementById('tab'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
+  if (v==='map') initMap();
+}
+
+// ── MAP ──
+function initMap() {
+  if (!map) {
+    map = L.map('leafletMap').setView([62,15],4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+  }
+  Object.values(markers).forEach(m=>m.remove()); markers={};
+  // Show both private and family on map
+  const all = [...privatePlaces.map(p=>({...p,_list:'private'})), ...familyPlaces.map(p=>({...p,_list:'family'}))];
+  const withCoords = all.filter(p=>p.lat&&p.lng);
+  if (!withCoords.length) { setTimeout(()=>map.invalidateSize(),100); return; }
+  const bounds = [];
+  withCoords.forEach(p => {
+    const color = p._list==='family' ? '#9B59B6' : (statusColors[p.status]||'#8B7355');
+    const icon = L.divIcon({
+      className:'',
+      html:`<div style="background:${color};width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;">${icons[p.type]||'📍'}</div>`,
+      iconSize:[30,30],iconAnchor:[15,15]
+    });
+    const m = L.marker([p.lat,p.lng],{icon}).addTo(map);
+    const dateStr = p.date?`<div class="popup-meta">${p.status==='done'?'Besøkt':'Planlagt'}: ${formatDate(p.date)}</div>`:'';
+    const listStr = p._list==='family'?'<span style="background:#9B59B6;color:white;font-size:.68rem;padding:1px 6px;border-radius:8px;">Familie</span>':'';
+    m.bindPopup(`<div class="popup-name">${icons[p.type]||'📍'} ${p.name}</div>
+      <div class="popup-meta">${labels[p.type]||''}${p.region?' · '+p.region:''} ${listStr}</div>
+      ${dateStr}
+      <div class="popup-link" onclick="switchView('detail');setListMode('${p._list}');selectPlace('${p.id}')">Vis detaljer →</div>`);
+    markers[p.id+'_'+p._list] = m;
+    bounds.push([p.lat,p.lng]);
+  });
+  if (bounds.length) map.fitBounds(bounds,{padding:[40,40]});
+  setTimeout(()=>map.invalidateSize(),100);
+}
+
+// ── LIST ──
+function getFiltered() {
+  return getPlaces().filter(p=>{
+    const typeOk = activeFilter==='alle'||p.type===activeFilter;
+    const statusOk = activeStatusFilter==='alle'||p.status===activeStatusFilter;
+    return typeOk&&statusOk;
+  });
+}
+
+function renderList() {
+  const list = document.getElementById('placeList');
+  const filtered = getFiltered();
+  if (!filtered.length) {
+    list.innerHTML=`<div class="empty-list"><div class="big">${listMode==='family'?'👨‍👩‍👧':'📭'}</div>${listMode==='family'?'Ingen steder i familielisten ennå.<br>Legg til og velg «Familielisten».':'Ingen steder ennå.<br>Trykk <strong>+ Legg til sted</strong>!'}</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(p=>{
+    const color = statusColors[p.status]||'#8B7355';
+    return `<div class="place-card ${selectedId===p.id?'selected':''}" onclick="selectPlace('${p.id}')">
+      <div class="card-icon">${icons[p.type]||'📍'}</div>
+      <div class="card-body">
+        <div class="card-name">${p.name}</div>
+        <div class="card-meta">${p.region||''}${p.date?' · '+formatDate(p.date):''}</div>
+        <div class="card-badges">
+          <span class="card-tag" style="background:var(--sage)">${labels[p.type]||p.type}</span>
+          <span class="card-tag" style="background:${color}">${statusLabels[p.status]||''}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setFilter(f,el) {
+  activeFilter=f;
+  document.querySelectorAll('.filter-row:first-of-type .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active'); renderList();
+}
+function setStatusFilter(f,el) {
+  activeStatusFilter=f;
+  ['sf-alle','sf-wishlist','sf-planned','sf-done'].forEach(id=>{
+    const c=document.getElementById(id);
+    c.classList.remove('active');
+  });
+  el.classList.add('active'); renderList();
+}
+
+// ── SELECT / DETAIL ──
+function selectPlace(id) {
+  selectedId=id; renderList();
+  const p = getPlaces().find(x=>x.id===id);
+  if (!p) return;
+  if (currentView==='map') switchView('detail');
+  showDetail(p);
+}
+
+function showDetail(p) {
+  document.getElementById('welcomeMsg').style.display='none';
+  const dc = document.getElementById('detailContent');
+  dc.style.display='block';
+  const isFam = listMode==='family';
+  dc.innerHTML=`<div class="detail-view">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${icons[p.type]||'📍'} ${p.name}</div>
+        <div class="detail-subtitle">
+          ${labels[p.type]||''}${p.region?' · '+p.region:''}
+          <span class="list-badge ${isFam?'family':'private'}">${isFam?'👨‍👩‍👧 Familie':'👤 Privat'}</span>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button class="btn-sm" onclick="refreshAI('${p.id}')">🔄 Oppdater</button>
+        ${!isFam?`<button class="btn-sm" onclick="moveToFamily('${p.id}')">👨‍👩‍👧 Del med familie</button>`:''}
+        <button class="btn-sm danger" onclick="deletePlace('${p.id}')">🗑</button>
+      </div>
+    </div>
+
+    <div class="date-section">
+      <div class="date-field">
+        <label>Status</label>
+        <select id="ds-status-${p.id}" onchange="updateStatus('${p.id}')">
+          <option value="wishlist" ${p.status==='wishlist'?'selected':''}>💭 Ønskeliste</option>
+          <option value="planned" ${p.status==='planned'?'selected':''}>📅 Planlagt</option>
+          <option value="done" ${p.status==='done'?'selected':''}>✅ Gjennomført</option>
+        </select>
+      </div>
+      <div class="date-field">
+        <label id="datelbl-${p.id}">${p.status==='done'?'Dato besøkt':'Planlagt dato'}</label>
+        <input type="date" id="ds-date-${p.id}" value="${p.date||''}" onchange="updateDate('${p.id}')"/>
+      </div>
+      <div style="padding-bottom:2px;">
+        <span class="status-badge ${statusClass[p.status]||'status-wishlist'}" id="ds-badge-${p.id}">
+          ${statusLabels[p.status]||''}${p.date?' · '+formatDate(p.date):''}
+        </span>
+      </div>
+    </div>
+
+    ${p.stats?renderStats(p.stats):''}
+
+    <div class="ai-section">
+      <h3>AI-informasjon <span class="ai-badge">Claude</span></h3>
+      <div id="aiContent-${p.id}">
+        ${p.aiInfo?`<div class="ai-content">${p.aiInfo}</div>`:'<div class="loading-dots"><span></span><span></span><span></span></div>'}
+      </div>
+    </div>
+
+    <div class="ai-section">
+      <h3>📝 Mine notater</h3>
+      <textarea class="notes-area" id="notesArea-${p.id}" placeholder="Egne tanker, tips, hvem anbefalte det...">${p.notes||''}</textarea>
+      <div style="margin-top:7px;display:flex;justify-content:flex-end;">
+        <button class="btn-sm" onclick="saveNotes('${p.id}')">Lagre notater</button>
+      </div>
+    </div>
+  </div>`;
+  if (!p.aiInfo) fetchAI(p);
+}
+
+function renderStats(s) {
+  const items=[];
+  if(s.lengde)items.push({val:s.lengde,lbl:'Lengde'});
+  if(s.hoyde)items.push({val:s.hoyde,lbl:'Høyde'});
+  if(s.tid)items.push({val:s.tid,lbl:'Tid'});
+  if(s.vanskelighet)items.push({val:s.vanskelighet,lbl:'Nivå'});
+  if(!items.length)return'';
+  return`<div class="stats-row">${items.map(i=>`<div class="stat-box"><div class="stat-val">${i.val}</div><div class="stat-lbl">${i.lbl}</div></div>`).join('')}</div>`;
+}
+
+// ── STATUS/DATE ──
+function updateStatus(id) {
+  const s = document.getElementById(`ds-status-${id}`).value;
+  const lbl = document.getElementById(`datelbl-${id}`);
+  if(lbl) lbl.textContent = s==='done'?'Dato besøkt':'Planlagt dato';
+  updateField(id,'status',s);
+}
+function updateDate(id) {
+  updateField(id,'date',document.getElementById(`ds-date-${id}`).value);
+}
+function updateField(id,field,val) {
+  if (listMode==='family') {
+    const idx=familyPlaces.findIndex(x=>x.id===id);
+    if(idx>-1){familyPlaces[idx][field]=val;updateInFamily(familyPlaces[idx]);}
+  } else {
+    const idx=privatePlaces.findIndex(x=>x.id===id);
+    if(idx>-1){privatePlaces[idx][field]=val;savePrivate();}
+  }
+  renderList(); updateBadge(id);
+}
+function updateBadge(id) {
+  const p=getPlaces().find(x=>x.id===id);
+  if(!p)return;
+  const el=document.getElementById(`ds-badge-${id}`);
+  if(el){el.className=`status-badge ${statusClass[p.status]||'status-wishlist'}`;el.textContent=(statusLabels[p.status]||'')+(p.date?' · '+formatDate(p.date):'');}
+}
+
+// ── MOVE TO FAMILY ──
+async function moveToFamily(id) {
+  const p = privatePlaces.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm(`Dele "${p.name}" med familielisten? Den forblir også i din private liste.`)) return;
+  await saveToFamily({...p,list:'family'});
+  showToast('✓ Delt med familielisten!');
+}
+
+// ── AI ──
+async function fetchAI(p) {
+  const el=document.getElementById(`aiContent-${p.id}`);
+  if(!el)return;
+  const typeMap={fjelltur:'fjelltur',sykkel:'sykkeltur',skitur:'skitur',ferie:'feriemål',dagstur:'dagstur'};
+  const prompt=`Du er en norsk reise- og turguide. Brukeren har lagret "${p.name}"${p.region?' i '+p.region:''} som et ${typeMap[p.type]||p.type}.
+
+Gi nyttig informasjon strukturert slik (bruk HTML med <p> og <strong>-tagger):
+1. Kort beskrivelse – hva er dette stedet/turen?
+2. Praktisk info – lengde, høyde, varighet, vanskelighetsgrad (der relevant)
+3. Beste årstid – når bør man dra?
+4. Overnatting – anbefalte alternativer i nærheten
+5. Reise dit – hvordan komme seg dit fra Norge
+6. Tips – 2-3 konkrete insider-tips
+
+Hold deg kortfattet men nyttig. Svar på norsk.
+
+Returner koordinater og JSON etter teksten merket ---JSON---:
+{"lat": 61.123, "lng": 8.456, "lengde": "X km", "hoyde": "X moh", "tid": "X timer", "vanskelighet": "Lett/Middels/Krevende"}
+lat/lng er omtrentlig koordinat for stedet (alltid inkluder). Utelat andre felt som ikke er relevante.`;
+
+  try {
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    const raw=data.content?.map(c=>c.text||'').join('')||'';
+    const parts=raw.split('---JSON---');
+    const htmlPart=parts[0].trim();
+    let meta=null;
+    if(parts[1]){try{meta=JSON.parse(parts[1].trim());}catch(e){}}
+
+    if(listMode==='family'){
+      const idx=familyPlaces.findIndex(x=>x.id===p.id);
+      if(idx>-1){
+        familyPlaces[idx].aiInfo=htmlPart;
+        if(meta){if(meta.lat)familyPlaces[idx].lat=meta.lat;if(meta.lng)familyPlaces[idx].lng=meta.lng;const{lat,lng,...stats}=meta;if(Object.keys(stats).length)familyPlaces[idx].stats=stats;}
+        updateInFamily(familyPlaces[idx]);
+      }
+    } else {
+      const idx=privatePlaces.findIndex(x=>x.id===p.id);
+      if(idx>-1){
+        privatePlaces[idx].aiInfo=htmlPart;
+        if(meta){if(meta.lat)privatePlaces[idx].lat=meta.lat;if(meta.lng)privatePlaces[idx].lng=meta.lng;const{lat,lng,...stats}=meta;if(Object.keys(stats).length)privatePlaces[idx].stats=stats;}
+        savePrivate();
+      }
+    }
+    if(el)el.innerHTML=`<div class="ai-content">${htmlPart}</div>`;
+    const updated=getPlaces().find(x=>x.id===p.id);
+    if(updated)showDetail(updated);
+  } catch(e){
+    if(el)el.innerHTML='<p style="color:#888">Kunne ikke hente info. Prøv igjen.</p>';
+  }
+}
+
+async function refreshAI(id) {
+  if(listMode==='family'){const idx=familyPlaces.findIndex(x=>x.id===id);if(idx>-1){familyPlaces[idx].aiInfo=null;familyPlaces[idx].stats=null;showDetail(familyPlaces[idx]);fetchAI(familyPlaces[idx]);}}
+  else{const idx=privatePlaces.findIndex(x=>x.id===id);if(idx>-1){privatePlaces[idx].aiInfo=null;privatePlaces[idx].stats=null;savePrivate();showDetail(privatePlaces[idx]);fetchAI(privatePlaces[idx]);}}
+}
+
+function saveNotes(id) {
+  const area=document.getElementById(`notesArea-${id}`);
+  if(!area)return;
+  updateField(id,'notes',area.value);
+  showToast('Notater lagret ✓');
+}
+
+function deletePlace(id) {
+  if(!confirm('Slette dette stedet?'))return;
+  if(listMode==='family'){familyPlaces=familyPlaces.filter(x=>x.id!==id);deleteFromFamily(id);}
+  else{privatePlaces=privatePlaces.filter(x=>x.id!==id);savePrivate();}
+  selectedId=null;renderList();
+  document.getElementById('welcomeMsg').style.display='flex';
+  document.getElementById('detailContent').style.display='none';
+}
+
+// ── MODAL ──
+function openModal() {
+  document.getElementById('inp-list').value=listMode;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('inp-name').focus();
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  ['inp-name','inp-region','inp-notes','inp-date'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('inp-type').value='fjelltur';
+  document.getElementById('inp-status').value='wishlist';
+}
+
+async function savePlace() {
+  const name=document.getElementById('inp-name').value.trim();
+  if(!name){alert('Skriv inn et navn');return;}
+  const targetList=document.getElementById('inp-list').value;
+  const p={
+    id:Date.now().toString(),name,
+    type:document.getElementById('inp-type').value,
+    region:document.getElementById('inp-region').value.trim(),
+    status:document.getElementById('inp-status').value,
+    date:document.getElementById('inp-date').value,
+    notes:document.getElementById('inp-notes').value.trim(),
+    aiInfo:null,stats:null,lat:null,lng:null,list:targetList
+  };
+  if(targetList==='family'){
+    await saveToFamily(p);
+    if(listMode!=='family')setListMode('family');
+  } else {
+    privatePlaces.unshift(p);savePrivate();
+    if(listMode!=='private')setListMode('private');
+  }
+  closeModal();renderList();selectPlace(p.id);
+}
+
+// ── EXPORT / IMPORT ──
+function openExportModal(){document.getElementById('exportModal').classList.add('open');}
+function closeExportModal(){document.getElementById('exportModal').classList.remove('open');document.getElementById('importText').value='';}
+
+function exportData() {
+  const data={version:2,exported:new Date().toISOString(),places:privatePlaces};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`turboka-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showToast('✓ Data lastet ned!');
+}
+
+function loadImportFile(e) {
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{document.getElementById('importText').value=ev.target.result;};
+  reader.readAsText(file);
+}
+
+function importData() {
+  const raw=document.getElementById('importText').value.trim();
+  if(!raw){alert('Lim inn JSON eller velg fil');return;}
+  try {
+    const parsed=JSON.parse(raw);
+    const incoming=parsed.places||parsed; // support both formats
+    if(!Array.isArray(incoming))throw new Error('Ugyldig format');
+    let added=0;
+    incoming.forEach(p=>{
+      if(!privatePlaces.find(x=>x.id===p.id)){privatePlaces.unshift(p);added++;}
+    });
+    savePrivate();renderList();
+    showToast(`✓ Importert ${added} nye steder!`);
+    closeExportModal();
+    if(listMode!=='private')setListMode('private');
+  } catch(e){alert('Ugyldig JSON – sjekk filen og prøv igjen.');}
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:22px;right:22px;background:#3D5A3E;color:white;padding:9px 16px;border-radius:8px;font-size:.84rem;font-weight:600;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,.2);';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2400);
+}
+
+// ── INIT ──
+renderList();
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+document.getElementById('exportModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
+</script>
+</body>
+</html>
