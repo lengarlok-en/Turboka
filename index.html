@@ -683,9 +683,9 @@ Returner koordinater og JSON etter teksten merket ---JSON---:
 lat/lng er omtrentlig koordinat for stedet (alltid inkluder). Utelat andre felt som ikke er relevante.`;
 
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('https://turbokaapi.llokken.workers.dev/',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]}),
     });
     const data=await res.json();
     const raw=data.content?.map(c=>c.text||'').join('')||'';
