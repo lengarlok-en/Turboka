@@ -197,18 +197,19 @@ if ('serviceWorker' in navigator) {
   .popup-link{display:inline-block;margin-top:7px;color:var(--moss);font-weight:600;cursor:pointer;font-size:.76rem;}
 
   @media(max-width:680px){
-    .shell{display:block;height:calc(100vh - 54px);overflow:hidden;}
-    .sidebar{position:fixed;inset:54px 0 0 0;z-index:50;display:flex;flex-direction:column;background:var(--snow);}
-    .sidebar.hidden{transform:translateX(-100%);pointer-events:none;}
-    .main-panel{position:fixed;inset:54px 0 0 0;z-index:60;background:var(--cream);display:none;flex-direction:column;}
+    header{position:fixed;top:0;left:0;right:0;z-index:500;flex-wrap:nowrap;}
+    header h1{font-size:1.1rem;}
+    .header-right{gap:4px;}
+    .btn-export{display:none;}
+    .nav-tab{font-size:.68rem;padding:4px 8px;}
+    .list-tab{font-size:.68rem;padding:4px 8px;}
+    .shell{display:block;height:100vh;overflow:hidden;}
+    .sidebar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;flex-direction:column;background:var(--snow);top:var(--header-h,54px);}
+    .main-panel{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--cream);display:none;flex-direction:column;top:var(--header-h,54px);}
     .main-panel.mobile-active{display:flex;}
     .detail-view{padding:14px;}
     .detail-header{flex-direction:column;}
     .back-btn{display:flex;}
-    .header-right{gap:5px;}
-    .btn-export{display:none;}
-    .nav-tab{font-size:.7rem;padding:5px 9px;}
-    .list-tab{font-size:.7rem;padding:4px 9px;}
   }
   .back-btn{display:none;align-items:center;gap:8px;padding:11px 14px;background:white;border-bottom:1px solid var(--stone);cursor:pointer;font-size:.85rem;font-weight:600;color:var(--moss);flex-shrink:0;}
 </style>
@@ -243,9 +244,9 @@ if ('serviceWorker' in navigator) {
       </div>
       <div class="filter-row">
         <button class="chip active" id="sf-alle" onclick="setStatusFilter('alle',this)">Alle</button>
-        <button class="chip" id="sf-wishlist" onclick="setStatusFilter('wishlist',this)">💭 Ønskeliste</button>
+        <button class="chip" id="sf-wishlist" onclick="setStatusFilter('wishlist',this)">💭 Ønske</button>
         <button class="chip" id="sf-planned" onclick="setStatusFilter('planned',this)">📅 Planlagt</button>
-        <button class="chip" id="sf-done" onclick="setStatusFilter('done',this)">✅ Gjennomført</button>
+        <button class="chip" id="sf-done" onclick="setStatusFilter('done',this)">✅ Ferdig</button>
       </div>
       <button class="btn-add" onclick="openModal()">+ Legg til sted</button>
     </div>
@@ -304,9 +305,9 @@ if ('serviceWorker' in navigator) {
       <div class="form-group">
         <label>Status</label>
         <select id="inp-status">
-          <option value="wishlist">💭 Ønskeliste</option>
+          <option value="wishlist">💭 Ønske</option>
           <option value="planned">📅 Planlagt</option>
-          <option value="done">✅ Gjennomført</option>
+          <option value="done">✅ Ferdig</option>
         </select>
       </div>
       <div class="form-group">
@@ -380,7 +381,7 @@ let markers = {};
 const icons = {fjelltur:'⛰️',sykkel:'🚴',skitur:'⛷️',ferie:'✈️',dagstur:'🥾'};
 const labels = {fjelltur:'Fjelltur',sykkel:'Sykkeltur',skitur:'Skitur',ferie:'Feriemål',dagstur:'Dagstur'};
 const statusColors = {wishlist:'#8B7355',planned:'#5B8FA8',done:'#3D5A3E'};
-const statusLabels = {wishlist:'💭 Ønskeliste',planned:'📅 Planlagt',done:'✅ Gjennomført'};
+const statusLabels = {wishlist:'💭 Ønske',planned:'📅 Planlagt',done:'✅ Ferdig'};
 const statusClass = {wishlist:'status-wishlist',planned:'status-planned',done:'status-done'};
 
 function getPlaces() { return listMode === 'family' ? familyPlaces : privatePlaces; }
@@ -611,9 +612,9 @@ function showDetail(p) {
       <div class="date-field">
         <label>Status</label>
         <select id="ds-status-${p.id}" onchange="updateStatus('${p.id}')">
-          <option value="wishlist" ${p.status==='wishlist'?'selected':''}>💭 Ønskeliste</option>
+          <option value="wishlist" ${p.status==='wishlist'?'selected':''}>💭 Ønske</option>
           <option value="planned" ${p.status==='planned'?'selected':''}>📅 Planlagt</option>
-          <option value="done" ${p.status==='done'?'selected':''}>✅ Gjennomført</option>
+          <option value="done" ${p.status==='done'?'selected':''}>✅ Ferdig</option>
         </select>
       </div>
       <div class="date-field">
@@ -856,6 +857,13 @@ function showToast(msg) {
 }
 
 // ── INIT ──
+function setHeaderHeight() {
+  const h = document.querySelector('header').offsetHeight;
+  document.documentElement.style.setProperty('--header-h', h + 'px');
+}
+setHeaderHeight();
+window.addEventListener('resize', setHeaderHeight);
+
 renderList();
 document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
 document.getElementById('exportModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeExportModal();});
