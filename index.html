@@ -233,7 +233,6 @@ if ('serviceWorker' in navigator) {
 <div class="shell">
   <aside class="sidebar">
     <div class="sidebar-top">
-      <button class="btn-add" onclick="openModal()">+ Legg til sted</button>
       <div class="filter-row">
         <button class="chip active" onclick="setFilter('alle',this)">Alle</button>
         <button class="chip" onclick="setFilter('fjelltur',this)">⛰️ Fjell</button>
@@ -248,6 +247,7 @@ if ('serviceWorker' in navigator) {
         <button class="chip" id="sf-planned" onclick="setStatusFilter('planned',this)">📅 Planlagt</button>
         <button class="chip" id="sf-done" onclick="setStatusFilter('done',this)">✅ Gjennomført</button>
       </div>
+      <button class="btn-add" onclick="openModal()">+ Legg til sted</button>
     </div>
     <div id="listBanner" class="private-banner">👤 Min private liste <span class="sync-indicator">lagret lokalt</span></div>
     <div class="place-list" id="placeList"></div>
@@ -459,11 +459,13 @@ function setListMode(mode) {
     banner.className = 'private-banner';
     banner.innerHTML = '👤 Min private liste <span class="sync-indicator">lagret lokalt</span>';
   }
-  // Update add modal default
   document.getElementById('inp-list').value = mode;
   renderList();
   document.getElementById('welcomeMsg').style.display = 'flex';
   document.getElementById('detailContent').style.display = 'none';
+  // Mobile: go back to list
+  document.getElementById('mainPanel').classList.remove('mobile-active');
+  if (document.getElementById('backBtn')) document.getElementById('backBtn').style.display = 'none';
 }
 
 // ── VIEW ──
