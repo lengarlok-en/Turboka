@@ -473,7 +473,10 @@ function switchView(v) {
   document.querySelectorAll('.nav-tab').forEach(el=>el.classList.remove('active'));
   document.getElementById('view'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
   document.getElementById('tab'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
-  if (v==='map') initMap();
+  if (v==='map') {
+    initMap();
+    if (isMobile()) showMobileDetail();
+  }
 }
 
 // ── MAP ──
@@ -555,13 +558,30 @@ function setStatusFilter(f,el) {
   el.classList.add('active'); renderList();
 }
 
+// ── MOBILE HELPERS ──
+function isMobile() { return window.innerWidth <= 680; }
+
+function showMobileDetail() {
+  if (!isMobile()) return;
+  document.getElementById('mainPanel').classList.add('mobile-active');
+  document.getElementById('backBtn').style.display = 'flex';
+}
+
+function goBackToList() {
+  document.getElementById('mainPanel').classList.remove('mobile-active');
+  selectedId = null;
+  renderList();
+}
+
 // ── SELECT / DETAIL ──
 function selectPlace(id) {
-  selectedId=id; renderList();
-  const p = getPlaces().find(x=>x.id===id);
+  selectedId = id;
+  renderList();
+  const p = getPlaces().find(x => x.id === id);
   if (!p) return;
-  if (currentView==='map') switchView('detail');
+  if (currentView === 'map') switchView('detail');
   showDetail(p);
+  showMobileDetail();
 }
 
 function showDetail(p) {
